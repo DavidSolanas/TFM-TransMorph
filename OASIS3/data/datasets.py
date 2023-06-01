@@ -10,7 +10,8 @@ import nibabel as nib
 
 class OASIS3BrainDataset(Dataset):
     def __init__(self, data_path, transforms, max_dataset_size):
-        self.paths = data_path
+        file_list = os.listdir(data_path)
+        self.paths = [os.path.join(data_path, file) for file in file_list]
         self.transforms = transforms
         self.max_dataset_size = max_dataset_size
 
@@ -34,7 +35,7 @@ class OASIS3BrainDataset(Dataset):
         x, y = x[None, ...], y[None, ...]
         x = self.transforms([x])
         y = self.transforms([y])
-        x = np.ascontiguousarray(x)  # [Bsize,channelsHeight,,Width,Depth]
+        x = np.ascontiguousarray(x)  # [Bsize,channels,Height,Width,Depth]
         y = np.ascontiguousarray(y)
         x, y = torch.from_numpy(x), torch.from_numpy(y)
         return x, y
