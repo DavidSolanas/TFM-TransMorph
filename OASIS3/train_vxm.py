@@ -15,7 +15,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 # os.getcwd() is assumed to be in a folder inside the root git repo folder
 code_folder = os.path.abspath(os.path.join(os.getcwd(), ".."))
-print(code_folder)
 sys.path.append(code_folder)
 sys.path.append(code_folder + '/Baseline_registration_models')
 sys.path.append(code_folder + '/Baseline_registration_models/VoxelMorph')
@@ -31,8 +30,8 @@ from Baseline_registration_models.VoxelMorph.train_vxm import adjust_learning_ra
 
 
 def main():
-    ROOT_DATA_DIR = '/Disco2021-I/david/tfm/dataset/OASIS3_processed/'
-    ROOT_LOG_DIR = '/Disco2021-I/david/tfm/tfm-tests/oasis3_500_pairs/'
+    ROOT_DATA_DIR = 'C:/Users/david/Documents/Master Ingenieria Informatica/TFM/dataset/OASIS3_processed/'
+    ROOT_LOG_DIR = './'
     batch_size = 1
     max_dataset_size = 500
     train_dir = ROOT_DATA_DIR + 'train/'
@@ -108,8 +107,8 @@ def main():
             model.train()
             adjust_learning_rate(optimizer, epoch, max_epoch, lr)
             data = [t.cuda() for t in data]
-            x = data[0]
-            y = data[1]
+            x = data[0][0] # remove extra first dim
+            y = data[1][0] # remove extra first dim
             x_in = torch.cat((x,y),dim=1)
             output = model(x_in)   
             loss = 0
@@ -157,7 +156,7 @@ if __name__ == '__main__':
     '''
     GPU configuration
     '''
-    GPU_iden = 1
+    GPU_iden = 0
     GPU_num = torch.cuda.device_count()
     print('Number of GPU: ' + str(GPU_num))
     for GPU_idx in range(GPU_num):
