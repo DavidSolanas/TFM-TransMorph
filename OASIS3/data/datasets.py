@@ -38,7 +38,7 @@ class OASIS3BrainDataset(Dataset):
         x = np.ascontiguousarray(x)  # [Bsize,channels,Height,Width,Depth]
         y = np.ascontiguousarray(y)
         x, y = torch.from_numpy(x), torch.from_numpy(y)
-        return x, y
+        return x, y, os.path.basename(os.path.normpath(path)), os.path.basename(os.path.normpath(tar_file))
 
     def __len__(self):
         return min(len(self.paths), self.max_dataset_size)

@@ -26,12 +26,18 @@ sys.path.append(code_folder + '/OASIS/TransMorph/data')
 from data import trans, datasets
 from Baseline_registration_models.VoxelMorph import utils, losses, models
 from OASIS.TransMorph import utils as utils_OASIS
-from Baseline_registration_models.VoxelMorph.train_vxm import adjust_learning_rate, mk_grid_img, comput_fig, save_checkpoint, Logger
+from Baseline_registration_models.VoxelMorph.train_vxm import adjust_learning_rate, mk_grid_img, comput_fig, Logger
 
+def save_checkpoint(state, save_dir='models', filename='checkpoint.pth.tar', max_model_num=8):
+    torch.save(state, save_dir+filename)
+    model_lists = natsorted(glob.glob(save_dir + '*'), reverse=True)
+    while len(model_lists) > max_model_num:
+        os.remove(model_lists[0])
+        model_lists = natsorted(glob.glob(save_dir + '*'), reverse=True)
 
 def main():
-    ROOT_DATA_DIR = 'C:/Users/david/Documents/Master Ingenieria Informatica/TFM/dataset/OASIS3_processed/'
-    ROOT_LOG_DIR = './'
+    ROOT_DATA_DIR = '/Disco2021-I/david/tfm/dataset/OASIS3_processed/'
+    ROOT_LOG_DIR = '/Disco2021-I/david/tfm/tfm-tests/oasis3_500_pairs/'
     batch_size = 1
     max_dataset_size = 500
     train_dir = ROOT_DATA_DIR + 'train/'
@@ -45,7 +51,7 @@ def main():
 
     lr = 0.0001 # learning rate
     epoch_start = 0
-    max_epoch = 100 #max traning epoch
+    max_epoch = 200 #max traning epoch
     vol_size = (128, 128, 128) # resize img to half the original size
     weights = [1, 0.02]
     cont_training = False
@@ -67,11 +73,11 @@ def main():
     If continue from previous training
     '''
     if cont_training:
-        epoch_start = 0
+        epoch_start = 100
         model_dir = ROOT_LOG_DIR + 'experiments/'+save_dir
         updated_lr = round(lr * np.power(1 - (epoch_start) / max_epoch,0.9),8)
-        best_model = torch.load(model_dir + natsorted(os.listdir(model_dir))[-1])['state_dict']
-        print('Model: {} loaded!'.format(natsorted(os.listdir(model_dir))[-1]))
+        best_model = torch.load(model_dir + natsorted(os.listdir(model_dir), reverse=True)[-1])['state_dict']
+        print('Model: {} loaded!'.format(natsorted(os.listdir(model_dir), reverse=True)[-1]))
         model.load_state_dict(best_model)
     else:
         updated_lr = lr
@@ -81,6 +87,7 @@ def main():
     Initialize training
     '''
     train_composed = transforms.Compose([trans.Resize_img(vol_size),
+                                         trans.MinMax_norm(),
                                          trans.NumpyType((np.float32, np.int16))])
 
     # TODO
@@ -106,7 +113,7 @@ def main():
             idx += 1
             model.train()
             adjust_learning_rate(optimizer, epoch, max_epoch, lr)
-            data = [t.cuda() for t in data]
+            data = [t.cuda() for t in data[:2]]
             x = data[0][0] # remove extra first dim
             y = data[1][0] # remove extra first dim
             x_in = torch.cat((x,y),dim=1)
@@ -137,7 +144,7 @@ def main():
             loss.backward()
             optimizer.step()
 
-            print('Iter {} of {} loss {:.4f}, Img Sim: {:.6f}, Reg: {:.6f}'.format(idx, len(train_loader), loss.item(), loss_vals[0].item()/2, loss_vals[1].item()/2))
+            print('Epoch {}: Iter {} of {} loss {:.4f}, Img Sim: {:.6f}, Reg: {:.6f}'.format(epoch, idx, len(train_loader), loss.item(), loss_vals[0].item()/2, loss_vals[1].item()/2))
         
         writer.add_scalar('Loss/train', loss_all.avg, epoch)
         print('Epoch {} loss {:.4f}'.format(epoch, loss_all.avg))
@@ -146,7 +153,7 @@ def main():
             'state_dict': model.state_dict(),
             'loss': loss_all.avg,
             'optimizer': optimizer.state_dict(),
-        }, save_dir=ROOT_LOG_DIR + 'experiments/' + save_dir, filename='epoch{}_loss{:.4f}.pth.tar'.format(epoch, loss_all.avg))
+        }, save_dir=ROOT_LOG_DIR + 'experiments/' + save_dir, filename='loss{:.4f}_epoch{}.pth.tar'.format(loss_all.avg, epoch))
 
         loss_all.reset()
     writer.close()
@@ -156,7 +163,7 @@ if __name__ == '__main__':
     '''
     GPU configuration
     '''
-    GPU_iden = 0
+    GPU_iden = 1
     GPU_num = torch.cuda.device_count()
     print('Number of GPU: ' + str(GPU_num))
     for GPU_idx in range(GPU_num):
