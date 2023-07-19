@@ -35,13 +35,21 @@ def save_checkpoint(state, save_dir='models', filename='checkpoint.pth.tar', max
         os.remove(model_lists[0])
         model_lists = natsorted(glob.glob(save_dir + '*'), reverse=True)
 
+
+def save_checkpoint_ncc(state, save_dir='models', filename='checkpoint.pth.tar', max_model_num=8):
+    torch.save(state, save_dir+filename)
+    model_lists = natsorted(glob.glob(save_dir + '*'))
+    while len(model_lists) > max_model_num:
+        os.remove(model_lists[0])
+        model_lists = natsorted(glob.glob(save_dir + '*'))
+
 def main():
     ROOT_DATA_DIR = '/Disco2021-I/david/tfm/dataset/OASIS3_processed/'
     ROOT_LOG_DIR = '/Disco2021-I/david/tfm/tfm-tests/oasis3_500_pairs/'
     batch_size = 1
     max_dataset_size = 500
     train_dir = ROOT_DATA_DIR + 'train/'
-    save_dir = 'OASIS3_500_pairs_MSE/'
+    save_dir = 'OASIS3_500_pairs_MSE_Interpn/'
 
     if not os.path.exists(ROOT_LOG_DIR + 'experiments/' + save_dir):
         os.makedirs(ROOT_LOG_DIR + 'experiments/' + save_dir)
@@ -51,7 +59,7 @@ def main():
 
     lr = 0.0001 # learning rate
     epoch_start = 0
-    max_epoch = 200 #max traning epoch
+    max_epoch = 50 #max traning epoch
     vol_size = (128, 128, 128) # resize img to half the original size
     weights = [1, 0.02]
     cont_training = False
@@ -60,7 +68,7 @@ def main():
     Initialize model
     '''
 
-    model = models.VxmDense_1(vol_size)
+    model = models.VxmDense_2(vol_size)
     model.cuda()
 
     '''
@@ -73,11 +81,12 @@ def main():
     If continue from previous training
     '''
     if cont_training:
-        epoch_start = 100
+        epoch_start = 200
+        model_idx = 0
         model_dir = ROOT_LOG_DIR + 'experiments/'+save_dir
         updated_lr = round(lr * np.power(1 - (epoch_start) / max_epoch,0.9),8)
-        best_model = torch.load(model_dir + natsorted(os.listdir(model_dir), reverse=True)[-1])['state_dict']
-        print('Model: {} loaded!'.format(natsorted(os.listdir(model_dir), reverse=True)[-1]))
+        best_model = torch.load(glob.glob(model_dir + "/*latest*")[model_idx])['state_dict']
+        print('Best model: {}'.format(glob.glob(model_dir + "/*latest*")[model_idx]))
         model.load_state_dict(best_model)
     else:
         updated_lr = lr
@@ -144,7 +153,7 @@ def main():
             loss.backward()
             optimizer.step()
 
-            print('Epoch {}: Iter {} of {} loss {:.4f}, Img Sim: {:.6f}, Reg: {:.6f}'.format(epoch, idx, len(train_loader), loss.item(), loss_vals[0].item()/2, loss_vals[1].item()/2))
+            print('Epoch {}: Iter {} of {} loss {:.6f}, Img Sim: {:.6f}, Reg: {:.6f}'.format(epoch, idx, len(train_loader), loss.item(), loss_vals[0].item()/2, loss_vals[1].item()/2))
         
         writer.add_scalar('Loss/train', loss_all.avg, epoch)
         print('Epoch {} loss {:.4f}'.format(epoch, loss_all.avg))
@@ -153,7 +162,16 @@ def main():
             'state_dict': model.state_dict(),
             'loss': loss_all.avg,
             'optimizer': optimizer.state_dict(),
-        }, save_dir=ROOT_LOG_DIR + 'experiments/' + save_dir, filename='loss{:.4f}_epoch{}.pth.tar'.format(loss_all.avg, epoch))
+        }, save_dir=ROOT_LOG_DIR + 'experiments/' + save_dir, filename='loss{:.6f}_epoch{}.pth.tar'.format((loss_all.avg), epoch))
+
+        if epoch == max_epoch - 1:
+            save_checkpoint({
+                'epoch': epoch,
+                'state_dict': model.state_dict(),
+                'loss': loss_all.avg,
+                'optimizer': optimizer.state_dict(),
+            }, save_dir=ROOT_LOG_DIR + 'experiments/' + save_dir, filename='loss{:.6f}_latest.pth.tar'.format((loss_all.avg), epoch),
+            max_model_num=999)
 
         loss_all.reset()
     writer.close()

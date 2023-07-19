@@ -8,6 +8,7 @@ from scipy import ndimage
 from .rand import Constant, Uniform, Gaussian
 from scipy.ndimage import rotate
 from skimage.transform import rescale, resize
+from scipy.interpolate import interpn
 
 class Base(object):
     def sample(self, *shape):
@@ -311,16 +312,32 @@ class Seg_norm(Base):
         return img_out
 
 class Resize_img(Base):
-    def __init__(self, shape):
+    def __init__(self, shape, force_nn=False):
         self.shape = shape
+        self.force_nn = force_nn
 
     def tf(self, img, k=0):
-        if k == 1:
-            img = resize(img, (img.shape[0], self.shape[0], self.shape[1], self.shape[2]),
-                         anti_aliasing=False, order=0)
+        xx = np.arange(self.shape[1]) 
+        yy = np.arange(self.shape[0])
+        zz = np.arange(self.shape[2])
+
+        xx = xx * img.shape[1] / self.shape[1]
+        yy = yy * img.shape[0] / self.shape[0] 
+        zz = zz * img.shape[2] / self.shape[2]
+
+        grid = np.rollaxis(np.array(np.meshgrid(xx, yy, zz)), 0, 4)
+
+        sample = np.stack((grid[:, :, :, 1], grid[:, :, :, 0], grid[:, :, :, 2]), 3)
+        xxx = np.arange(img.shape[1])
+        yyy = np.arange(img.shape[0])
+        zzz = np.arange(img.shape[2])  
+
+        img = img[0:img.shape[0],0:img.shape[1],0:img.shape[2]]
+
+        if k == 1 or self.force_nn:
+            img = interpn((yyy, xxx, zzz), img, sample, method='nearest', bounds_error=False, fill_value=0)
         else:
-            img = resize(img, (img.shape[0], self.shape[0], self.shape[1], self.shape[2]),
-                         anti_aliasing=False, order=3)
+            img = interpn((yyy, xxx, zzz), img, sample, method='linear', bounds_error=False, fill_value=0)
         return img
 
 class Pad(Base):
@@ -482,6 +499,7 @@ class NumpyType(Base):
         if self.num > 0 and k >= self.num:
             return img
         # make this work with both Tensor and Numpy
+
         return img.astype(self.types[k])
 
     def __str__(self):

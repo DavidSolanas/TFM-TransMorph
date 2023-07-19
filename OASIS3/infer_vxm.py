@@ -83,14 +83,14 @@ def main():
     ROOT_LOG_DIR = '/Disco2021-I/david/tfm/tfm-tests/oasis3_500_pairs/'
     
     test_dir = ROOT_DATA_DIR + 'test/'
-    model_folder = 'OASIS3_500_pairs_MSE/'
-    model_idx = -1
+    model_folder = 'OASIS3_500_pairs_MSE_Interpn/'
+    model_idx = 0
     vol_size = (128, 128, 128) # resize img to half the original size
     model_dir = ROOT_LOG_DIR + 'experiments/' + model_folder
     
-    model = models.VxmDense_1(vol_size)
-    best_model = torch.load(model_dir + natsorted(os.listdir(model_dir), reverse=True)[model_idx])['state_dict']
-    print('Best model: {}'.format(natsorted(os.listdir(model_dir), reverse=True)[model_idx]))
+    model = models.VxmDense_2(vol_size)
+    best_model = torch.load(glob.glob(model_dir + "/*latest*")[model_idx])['state_dict']
+    print('Best model: {}'.format(glob.glob(model_dir + "/*latest*")[model_idx]))
     model.load_state_dict(best_model)
     model.cuda()
     
