@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch
 from torchvision import transforms
 from natsort import natsorted
-import neurite as ne
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 import nibabel as nib

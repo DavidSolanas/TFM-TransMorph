@@ -203,6 +203,29 @@ class CenterCrop(Base):
     def __str__(self):
         return 'CenterCrop({})'.format(self.size)
 
+
+class OASIS3Crop(Base):
+    def __init__(self):
+        # Precomputed crop for OASIS3 processed volumes
+        self.min_x = 14
+        self.max_x = 179
+        self.min_y = 16
+        self.max_y = 221
+        self.min_z = 60
+        self.max_z = 242
+
+
+    def sample(self, *shape):
+        return [0] * len(shape)
+
+    def tf(self, img, k=0):
+        # print(img.shape)#(1, 240, 240, 155, 4)
+        return img[self.min_x-1:self.max_x+1, self.min_y-1:self.max_y+1, self.min_z-1:self.max_z+1]
+        # return img[self.buffer]
+
+    def __str__(self):
+        return 'OASIS3Crop'
+
 class CenterCropBySize(CenterCrop):
     def sample(self, *shape):
         assert len(self.size) == 3  # random crop [H,W,T] from img [240,240,155]
