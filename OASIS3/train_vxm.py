@@ -36,8 +36,8 @@ def main():
     batch_size = 1
     max_dataset_size = 500
     train_dir = ROOT_DATA_DIR + 'train/'
-    val_dir = ROOT_DATA_DIR + 'test/'
-    save_dir = 'OASIS3_final_pairs_MSE_Interpn_train_val/'
+    val_dir = ROOT_DATA_DIR + 'validation/'
+    save_dir = 'OASIS3_final_T2_T1_MSE/'
     #save_dir = 'test/'
 
     if not os.path.exists(ROOT_LOG_DIR + 'experiments/' + save_dir):
@@ -48,10 +48,10 @@ def main():
 
     lr = 0.0001 # learning rate
     epoch_start = 0
-    max_epoch = 50 #max traning epoch
+    max_epoch = 100 #max traning epoch
     vol_size = (128, 128, 128) # resize img to half the original size
     weights = [1, 0.02]
-    cont_training = True
+    cont_training = False
 
     '''
     Initialize model

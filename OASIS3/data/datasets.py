@@ -24,7 +24,7 @@ class OASIS3BrainDataset(Dataset):
     def __getitem__(self, index):
         path = self.paths[index]
         tar_file = self.paths[(index+1) % len(self.paths)]
-        x = nib.load(os.path.join(os.path.join(path, 'T1w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
+        x = nib.load(os.path.join(os.path.join(path, 'T2w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
         y = nib.load(os.path.join(os.path.join(tar_file, 'T1w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
         # Get data array from NIfTI
         x, y = x.get_fdata(), y.get_fdata()
@@ -45,12 +45,13 @@ class OASIS3BrainDataset(Dataset):
 
 
 class OASISBrainInferDataset(Dataset):
-    def __init__(self, data_path, transforms, max_dataset_size):
+    def __init__(self, data_path, transforms, max_dataset_size, test=False):
         file_list = os.listdir(data_path)
         self.paths = [os.path.join(data_path, file) for file in file_list]
         self.transforms = transforms
         self.max_dataset_size = max_dataset_size
-        self.seg_path = '/home/ubaldo/segs'
+        self.seg_path = '/home/ubaldo/segs/T2/'
+        self.seg_path += 'test' if test else 'val'
 
     def one_hot(self, img, C):
         out = np.zeros((C, img.shape[1], img.shape[2], img.shape[3]))
@@ -61,14 +62,14 @@ class OASISBrainInferDataset(Dataset):
     def __getitem__(self, index):
         path = self.paths[index]
         tar_file = self.paths[(index+1) % len(self.paths)]
-        x = nib.load(os.path.join(os.path.join(path, 'T1w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
+        x = nib.load(os.path.join(os.path.join(path, 'T2w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
         y = nib.load(os.path.join(os.path.join(tar_file, 'T1w'), 'orig_nu_noskull_mni_prealigned_rigid_affine_no_skullWarped.nii'))
         # Load segmentations
         path_seg = os.path.basename(os.path.normpath(path)) + '_synthseg.nii'
         tar_file_seg = os.path.basename(os.path.normpath(tar_file))  + '_synthseg.nii'
 
         x_seg = nib.load(os.path.join(self.seg_path, path_seg))
-        y_seg = nib.load(os.path.join(self.seg_path, tar_file_seg))
+        y_seg = nib.load(os.path.join(self.seg_path.replace('T2', 'T1'), tar_file_seg))
         
         # Get data array from NIfTI
         x, y = x.get_fdata(), y.get_fdata()
