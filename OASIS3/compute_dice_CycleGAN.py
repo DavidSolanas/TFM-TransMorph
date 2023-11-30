@@ -126,14 +126,14 @@ def compute_dsc_from_fixed_volumes(model: nn.Module, reg_model: nn.Module):
 
 
 def main():
-    ROOT_DATA_DIR = '/Sauron1/david/tfm/dataset/OASIS3_final/'
+    ROOT_DATA_DIR = 'C:/Users/david/Documents/Master Ingenieria Informatica/TFM/dataset/dataset/OASIS3_final/'
     ROOT_LOG_DIR = '/home/davidpet/tfm/Monica/'
     
     test_dir = ROOT_DATA_DIR + 'test/'
-    model_folder = 'OASIS3_final_T1_T2_NCC/'
+    model_folder = 'OASIS3_final_T1_MI/'
     model_idx = 0
     vol_size = (128, 128, 128) # resize img to half the original size
-    model_dir = '/Sauron1/david/tfm/tfm-tests/oasis3_final_pairs/experiments/' + model_folder
+    model_dir = 'C:/Users/david/Documents/Master Ingenieria Informatica/TFM/code/TFM_Unizar/TFM_TransMorph/OASIS3/experiments/oasis3_final_pairs/' + model_folder
 
     #if not os.path.exists(ROOT_LOG_DIR + 'logs/' + model_folder):
     #    os.makedirs(ROOT_LOG_DIR + 'logs/' + model_folder)
@@ -168,7 +168,8 @@ def main():
 
     # TODO
 
-    test_set = datasets.OASISBrainInferDataset(test_dir, transforms=vxm_transforms, max_dataset_size=np.inf, test=True)
+    test_set = datasets.OASISBrainInferFromCycleGANDataset(test_dir, transforms=vxm_transforms, max_dataset_size=np.inf,
+                                                           test=True)
     test_loader = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
 
     best_dsc = 0
@@ -185,37 +186,39 @@ def main():
     with torch.no_grad():
         for data in test_loader:
             model.eval()
-            data = [t.cuda() for t in data]
-            x = data[0]
-            y = data[1]
-            x_seg = data[2]
-            y_seg = data[3]
+            data2 = [t.cuda() for t in data[:4]]
+            x = data2[0]
+            y = data2[1]
+            x_seg = data2[2]
+            y_seg = data2[3]
+            print(data[4:])
+            x_name = data[-2][0].split('/')[-1]
+            y_name = data[-1][0].split('/')[-1]
+            warp_name = x_name + '-' + y_name + '_warp.nii.gz'
+            warped_name = x_name + '-' + y_name + '_warped.nii.gz'
             x_in = torch.cat((x, y), dim=1)
             grid_img = mk_grid_img(8, 1, vol_size)
             output = model(x_in)
+
             def_out = reg_model([x_seg.cuda().float(), output[1].cuda()])
             def_grid = reg_model_bilin([grid_img.float(), output[1].cuda()])
-            #print(x.shape)            
-            #print(y.shape)
-            #print(x_seg.shape)
-            #print(y_seg.shape)
-            #print(output[0].cuda().shape)
-            #print(output[1].cuda().shape)
-            #print(def_out.long().shape)
+
             #save_nifti_volume(x, 'moving.nii.gz')
             #save_nifti_volume(y, 'fixed.nii.gz')
             #save_nifti_volume(x_seg, 'moving_seg.nii.gz')
             #save_nifti_volume(y_seg, 'fixed_seg.nii.gz')
-            #save_nifti_volume(output[0].cuda(), 'moved.nii.gz')
-            #save_nifti_volume(output[1].cuda(), 'warp.nii.gz')
-            #save_nifti_volume(def_out.long().to(torch.int32), 'out_seg_warp.nii.gz')
+            save_nifti_volume(output[0].cuda(), warped_name)
+            save_nifti_volume(output[1].cuda(), warp_name)
+            #save_nifti_volume(def_out.long().to(torch.int32), 'out_seg_warp_fakeT1.nii.gz')
             dsc = dice(def_out.long(), y_seg.long(), 32)
+            #compute_jacobian(output[1].cpu().numpy()[0])
+            print("DSC::::", dsc)
             eval_dsc.update(dsc.item(), x.size(0))
             print(eval_dsc.avg)
             print()
 
     #writer.add_scalar('DSC/validate', eval_dsc.avg, epoch)
-    print(f'Mean DSC: {eval_dsc.avg} ({eval_dsc.std})')
+    print(f'Mean DSC: {eval_dsc.avg:.3f} ({eval_dsc.std:.3f})')
     # MSE: Mean DSC: 0.3214651603996754; 
     return
     # Create a figure with multiple subplots

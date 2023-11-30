@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import nibabel as nib
 
 
 def save_image(volume, outfile, size=128):
@@ -26,20 +27,13 @@ def save_image(volume, outfile, size=128):
     plt.tight_layout()
 
     # Save the figure as an image file
-    plt.savefig(outfile)
+    plt.show()
 
 
 if __name__ == "__main__":
-    x = np.load('x.npy')[0]
-    y = np.load('y.npy')[0]
+    x = nib.load("C:/Users/david/Documents/Master Ingenieria Informatica/TFM/dataset/OASIS3_final/test/OAS30030_d0170/T2w/realT2w.nii.gz").get_fdata()
+    y = nib.load("C:/Users/david/Documents/Master Ingenieria Informatica/TFM/dataset/OASIS3_final/test/OAS30051_d0200/T1w/realT1w.nii.gz").get_fdata()
 
     print(x.shape, y.shape)
     save_image(x, 'x.png')
     save_image(y, 'y.png')
-
-    x = np.load('x_orig.npy')
-    y = np.load('y_orig.npy')
-
-    print(x.shape, y.shape)
-    save_image(x, 'x_orig.png', size=256)
-    save_image(y, 'y_orig.png', size=256)

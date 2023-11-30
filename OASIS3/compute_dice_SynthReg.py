@@ -20,8 +20,7 @@ sys.path.append(code_folder + '/OASIS/TransMorph')
 sys.path.append(code_folder + '/OASIS/TransMorph/data')
 
 from data import trans, datasets
-from Baseline_registration_models.VoxelMorph import utils, models
-from Baseline_registration_models.VoxelMorph.train_vxm import  mk_grid_img, comput_fig
+from Baseline_registration_models.VoxelMorph import utils
 
 
 def dice_mhg(y_pred, y_true, nlabels):
@@ -127,38 +126,24 @@ def compute_dsc_from_fixed_volumes(model: nn.Module, reg_model: nn.Module):
 
 def main():
     ROOT_DATA_DIR = '/Sauron1/david/tfm/dataset/OASIS3_final/'
-    ROOT_LOG_DIR = '/home/davidpet/tfm/Monica/'
     
     test_dir = ROOT_DATA_DIR + 'test/'
-    model_folder = 'OASIS3_final_T1_T2_NCC/'
-    model_idx = 0
     vol_size = (128, 128, 128) # resize img to half the original size
-    model_dir = '/Sauron1/david/tfm/tfm-tests/oasis3_final_pairs/experiments/' + model_folder
 
     #if not os.path.exists(ROOT_LOG_DIR + 'logs/' + model_folder):
     #    os.makedirs(ROOT_LOG_DIR + 'logs/' + model_folder)
     #sys.stdout = Logger(ROOT_LOG_DIR + 'logs/' + model_folder)
     
-    '''
-    Load model
-    '''
-    model = models.VxmDense_2(vol_size)
-    best_model = torch.load(glob.glob(model_dir + "/*latest*")[model_idx])['state_dict']
-    print('Best model: {}'.format(glob.glob(model_dir + "/*latest*")[model_idx]))
-    model.load_state_dict(best_model)
-    model.cuda()
 
     '''
     Initialize spatial transformation function
     '''
     reg_model = utils.register_model(vol_size, 'nearest')
     reg_model.cuda()
-    reg_model_bilin = utils.register_model(vol_size, 'bilinear')
-    reg_model_bilin.cuda()
 
 
     '''
-    Initialize training
+    Initialize data
     '''
     vxm_transforms = transforms.Compose([trans.OASIS3Crop(),
                                      trans.Resize_img(vol_size),
@@ -168,11 +153,9 @@ def main():
 
     # TODO
 
-    test_set = datasets.OASISBrainInferDataset(test_dir, transforms=vxm_transforms, max_dataset_size=np.inf, test=True)
+    test_set = datasets.OASISBrainInferFromSynthReg(test_dir, transforms=vxm_transforms, max_dataset_size=np.inf, test=True)
     test_loader = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
 
-    best_dsc = 0
-    best_dsc_mhg = 0
     #writer = SummaryWriter(log_dir='logs/'+model_folder)
     
     #compute_dsc_from_fixed_volumes(model, reg_model)
@@ -184,102 +167,28 @@ def main():
     eval_dsc = utils.AverageMeter()
     with torch.no_grad():
         for data in test_loader:
-            model.eval()
+
             data = [t.cuda() for t in data]
-            x = data[0]
-            y = data[1]
-            x_seg = data[2]
-            y_seg = data[3]
-            x_in = torch.cat((x, y), dim=1)
-            grid_img = mk_grid_img(8, 1, vol_size)
-            output = model(x_in)
-            def_out = reg_model([x_seg.cuda().float(), output[1].cuda()])
-            def_grid = reg_model_bilin([grid_img.float(), output[1].cuda()])
-            #print(x.shape)            
-            #print(y.shape)
-            #print(x_seg.shape)
-            #print(y_seg.shape)
-            #print(output[0].cuda().shape)
-            #print(output[1].cuda().shape)
-            #print(def_out.long().shape)
+            x_seg = data[0]
+            y_seg = data[1]
+            warp = data[2]
+
+            def_out = reg_model([x_seg.cuda().float(), warp])
             #save_nifti_volume(x, 'moving.nii.gz')
             #save_nifti_volume(y, 'fixed.nii.gz')
             #save_nifti_volume(x_seg, 'moving_seg.nii.gz')
             #save_nifti_volume(y_seg, 'fixed_seg.nii.gz')
-            #save_nifti_volume(output[0].cuda(), 'moved.nii.gz')
-            #save_nifti_volume(output[1].cuda(), 'warp.nii.gz')
-            #save_nifti_volume(def_out.long().to(torch.int32), 'out_seg_warp.nii.gz')
+            #save_nifti_volume(output[0].cuda(), 'moved_fakeT1.nii.gz')
+            #save_nifti_volume(warp, 'warp_fakeT1.nii.gz')
+            #save_nifti_volume(def_out.long().to(torch.int32), 'out_seg_warp_fakeT1.nii.gz')
             dsc = dice(def_out.long(), y_seg.long(), 32)
-            eval_dsc.update(dsc.item(), x.size(0))
+            eval_dsc.update(dsc.item(), x_seg.size(0))
             print(eval_dsc.avg)
             print()
 
     #writer.add_scalar('DSC/validate', eval_dsc.avg, epoch)
-    print(f'Mean DSC: {eval_dsc.avg} ({eval_dsc.std})')
-    # MSE: Mean DSC: 0.3214651603996754; 
-    return
-    # Create a figure with multiple subplots
-    plt.switch_backend('agg')
-    pred_fig = comput_fig(def_out)
-    grid_fig = comput_fig(def_grid)
-    x_fig = comput_fig(x_seg)
-    tar_fig = comput_fig(y_seg)
-    # Create a new combined figure with multiple subplots
-    fig_combined = plt.figure(figsize=(12, 8))
-    ax1 = fig_combined.add_subplot(221)
-    ax2 = fig_combined.add_subplot(222)
-    ax3 = fig_combined.add_subplot(223)
-    ax4 = fig_combined.add_subplot(224)
-    ax1.set_title('Grid')
-    ax1.set_title('input')
-    ax1.set_title('ground truth')
-    ax1.set_title('prediction')
-    ax1.imshow(grid_fig)
-    ax2.imshow(x_fig)
-    ax3.imshow(tar_fig)
-    ax4.imshow(pred_fig)
-    plt.tight_layout()
-    plt.show()
-    #writer.add_figure('Grid', grid_fig, epoch)
-    plt.close(grid_fig)
-    #writer.add_figure('input', x_fig, epoch)
-    plt.close(x_fig)
-    #writer.add_figure('ground truth', tar_fig, epoch)
-    plt.close(tar_fig)
-    #writer.add_figure('prediction', pred_fig, epoch)
-    plt.close(pred_fig)
-    #writer.close()
+    print(f'Mean DSC: {eval_dsc.avg:.3f} ({eval_dsc.std:.3f})')
 
-
-def save_nifti_volume(data: torch, outpath: str):
-    # Assuming you have a Torch tensor called 'data' with shape (C, D, H, W)
-    # C: number of channels, D: depth, H: height, W: width
-
-    # Convert the Torch tensor to a NumPy array
-    data_np = data[0].cpu().numpy()
-
-    # Transpose the array to match the NIfTI format (D, H, W, C)
-    data_np = np.transpose(data_np, (1, 2, 3, 0))
-
-    # Create a NIfTI image object
-    nifti_img = nib.Nifti1Image(data_np, affine=None)  # Set the 'affine' parameter if needed
-
-    # Save the NIfTI image to a file
-    nib.save(nifti_img, outpath)
-
-def comput_fig(img):
-    img = img.detach().cpu().numpy()[0, 0, 48:64, :, :]
-    fig = plt.figure(figsize=(12, 12), dpi=180)
-    for i in range(img.shape[0]):
-        plt.subplot(4, 4, i + 1)
-        plt.axis('off')
-        plt.imshow(img[i, :, :], cmap='gray')
-    fig.subplots_adjust(wspace=0, hspace=0)
-    return fig
-
-def adjust_learning_rate(optimizer, epoch, MAX_EPOCHES, INIT_LR, power=0.9):
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = round(INIT_LR * np.power(1 - (epoch) / MAX_EPOCHES, power), 8)
 
 
 if __name__ == '__main__':
